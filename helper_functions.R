@@ -89,31 +89,8 @@ get_discount_events <- function() {
   return(events)
 }
 
-# define function to parse json and return specific fields
-parse_json <- function(df) {
-  
-  # parse json and create a data.frame
-  res <- jsonlite::stream_in(textConnection(df$data))
-  
-  # get the key information
-  df <- df %>%
-    mutate(subscription_id = res$object$id, 
-           customer_id = res$object$customer,
-           status = res$object$status,
-           plan_id = res$object$plan$id,
-           plan_amount = res$object$plan$amount,
-           plan_interval = res$object$plan$interval,
-           previous_plan_id = res$previous_attributes$plan$id,
-           previous_plan_amount = res$previous_attributes$plan$amount,
-           previous_plan_interval = res$previous_attributes$plan$interval,
-           previous_status = res$previous_attributes$status)
-  
-  # return data frame
-  return(df)
-}
-
 # define function to parse json from discount data
-parse_discount_json <- function(discounts) {
+parse_discounts <- function(discounts) {
   
   # parse json and create a data.frame
   res <- jsonlite::stream_in(textConnection(discounts$data))
@@ -145,9 +122,65 @@ clean_discounts <- function(discounts) {
     summarise(discount_start_date = min(discount_start_date, na.rm = TRUE), 
               discount_end_date = max(discount_end_date, na.rm = TRUE))
   
+  # group by customer
+  customer_discounts <- discounts_cleaned %>%
+    group_by(customer_id) %>%
+    summarise(discount_amount_off = max(discount_amount_off), discount_percent_off = max(discount_percent_off),
+              discount_start_date = min(discount_start_date), discount_end_date = max(discount_end_date))
+  
   # return discounts
+  return(customer_discounts)
+}
+
+# define function to get discounts
+get_discounts <- function() {
+  
+  discounts <- get_discount_events()
+  discounts_parsed <- parse_discounts(discounts)
+  discounts_cleaned <- clean_discounts(discounts_parsed)
+  
   return(discounts_cleaned)
 }
+
+# define function to parse json and return specific fields
+parse_json <- function(df) {
+  
+  # parse json and create a data.frame
+  res <- jsonlite::stream_in(textConnection(df$data))
+  
+  # get the key information
+  df <- df %>%
+    mutate(subscription_id = res$object$id, 
+           customer_id = res$object$customer,
+           status = res$object$status,
+           plan_id = res$object$plan$id,
+           plan_amount = res$object$plan$amount,
+           plan_interval = res$object$plan$interval,
+           previous_plan_id = res$previous_attributes$plan$id,
+           previous_plan_amount = res$previous_attributes$plan$amount,
+           previous_plan_interval = res$previous_attributes$plan$interval,
+           previous_status = res$previous_attributes$status)
+  
+  # return data frame
+  return(df)
+}
+
+# function to get parsed subscription events
+get_subscription_events <- function(start, end) {
+  
+  # get stripe events
+  print('collecting events')
+  events <- get_stripe_events(start_date = start, end_date = end)
+  
+  # parse json
+  print('parsing json')
+  events_parsed <- parse_json(events)
+  print('done')
+  
+  # return subscription events
+  return(events_parsed)
+}
+
 
 # define function to get mrr amounts
 get_mrr_amounts <- function(df) {
@@ -169,7 +202,17 @@ apply_discount <- function(df) {
   # determine if discount applies
   df <- df %>%
     mutate(discount_applies = (discount_start_date < (date + days(4)) & (is.na(as.Date(discount_end_date, '%Y-%m-%d', tz = 'UTC')) | discount_end_date > date))) %>%
-    mutate(discounted_amount = ifelse(discount_applies, mrr_amount * (discount_percent_off / 100), 0))
+    mutate(plan_discount_amount = ifelse(discount_applies, plan_mrr_amount * (discount_percent_off / 100), 0),
+           previous_plan_discount_amount = ifelse(discount_applies, previous_plan_mrr_amount * (discount_percent_off / 100), 0))
+  
+  # replace na with 0
+  df$plan_discount_amount[is.na(df$plan_discount_amount)] <- 0
+  df$previous_plan_discount_amount[is.na(df$previous_plan_discount_amount)] <- 0
+  
+  # subtract discounts from MRR
+  df <- df %>%
+    mutate(plan_mrr_amount = plan_mrr_amount - plan_discount_amount,
+           previous_plan_mrr_amount = previous_plan_mrr_amount - previous_plan_discount_amount)
   
   # return df
   return(df)
