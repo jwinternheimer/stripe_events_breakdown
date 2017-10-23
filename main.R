@@ -5,15 +5,6 @@ main <- function(start, end) {
   # get subscriptions and charges
   subs <- get_subscriptions()
   
-  # get total number of charges for subscription
-  subs_total_charges <- subs %>%
-    group_by(subscription_id) %>%
-    summarise(total_charges = sum(charges))
-  
-  # join total number of charges
-  subs <- subs %>%
-    left_join(subs_total_charges, by = 'subscription_id')
-  
   # get discount events
   discounts <- get_discount_events()
   
@@ -71,3 +62,9 @@ main <- function(start, end) {
 
 # get september events
 # september <- main(start = '2017-09-01', end = '2017-09-30')
+# saveRDS(september, file = 'sep.rds')
+
+# get october events
+# october <- main(start = '2017-10-01', end = Sys.Date())
+# saveRDS(october, file = 'oct.rds')
+

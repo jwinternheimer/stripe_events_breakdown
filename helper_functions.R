@@ -26,6 +26,15 @@ get_subscriptions <- function() {
   # run query
   subs <- query_db(subscription_query, con)
   
+  # get total number of charges for subscription
+  subs_total_charges <- subs %>%
+    group_by(subscription_id) %>%
+    summarise(total_charges = sum(charges))
+  
+  # join total number of charges
+  subs <- subs %>%
+    left_join(subs_total_charges, by = 'subscription_id')
+  
   # retun subscriptions
   return(subs)
 }
