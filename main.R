@@ -30,11 +30,38 @@ main <- function(start, end) {
   # apply discounts
   events_discounted <- apply_discount(events_with_discounts)
   
-  # set the correct mrr amount
-  mrr_changes <- get_mrr_change(event_types)
+  # get upgrades and downgrades (we'll call them upgrades)
+  upgrades <- events_discounted %>%
+    filter(event_type == 'upgrade' | event_type == 'downgrade')
   
+  # duplicate upgrade events
+  upgrade_dups <- upgrades
   
-  return(events_discounted)
+  # set event types and IDs
+  upgrades <- upgrades %>%
+    mutate(event_type = paste(event_type, 'in', sep = '_')) %>%
+    mutate(id = paste(id, event_type, sep = '_'))
+  
+  upgrade_dups <- upgrade_dups %>%
+    mutate(event_type = paste(event_type, 'out', sep = '_')) %>%
+    mutate(id = paste(id, event_type, sep = '_'))
+  
+  # switch plan id and plan mrr amount for upgrades out
+  upgrade_dups <- upgrade_dups %>%
+    mutate(plan_id = previous_plan_id,
+           plan_mrr_amount = previous_plan_mrr_amount * -1)
+  
+  # merge upgrades in and out
+  upgrades_in_and_out <- rbind(upgrades, upgrade_dups) 
+  
+  # merge into original data frame
+  final_events <- events_discounted %>%
+    filter(event_type != 'upgrade' & event_type != 'downgrade') %>%
+    bind_rows(upgrades_in_and_out) %>%
+    mutate(plan_mrr_amount = ifelse(event_type == 'churn', plan_mrr_amount * -1, plan_mrr_amount))
+  
+  # return final data frame
+  return(final_events)
 }
 
 
