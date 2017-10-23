@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+sep.rds
+oct.rds
+ad_hoc_october_analysis.R
