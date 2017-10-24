@@ -235,6 +235,43 @@ get_event_types <- function(df) {
   return(df)
 }
 
+# handle upgrades and downgrades in/out
+handle_upgrades <- function(df) {
+  
+  # get upgrades and downgrades (we'll call them upgrades)
+  upgrades <- df %>%
+    filter(event_type == 'upgrade' | event_type == 'downgrade')
+  
+  # duplicate upgrade events
+  upgrade_dups <- upgrades
+  
+  # set event types and IDs
+  upgrades <- upgrades %>%
+    mutate(event_type = paste(event_type, 'in', sep = '_')) %>%
+    mutate(id = paste(id, event_type, sep = '_'))
+  
+  upgrade_dups <- upgrade_dups %>%
+    mutate(event_type = paste(event_type, 'out', sep = '_')) %>%
+    mutate(id = paste(id, event_type, sep = '_'))
+  
+  # switch plan id and plan mrr amount for upgrades out
+  upgrade_dups <- upgrade_dups %>%
+    mutate(plan_id = previous_plan_id,
+           plan_mrr_amount = previous_plan_mrr_amount * -1)
+  
+  # merge upgrades in and out
+  upgrades_in_and_out <- rbind(upgrades, upgrade_dups) 
+  
+  # merge into original data frame
+  final_events <- df %>%
+    filter(event_type != 'upgrade' & event_type != 'downgrade') %>%
+    bind_rows(upgrades_in_and_out) %>%
+    mutate(plan_mrr_amount = ifelse(event_type == 'churn', plan_mrr_amount * -1, plan_mrr_amount))
+  
+  # return final events
+  return(final_events)
+}
+
 # get mrr change amounts
 get_mrr_change <- function(df) {
   
