@@ -39,10 +39,10 @@ main <- function(start, end) {
 
 
 # get september events
-september <- main(start = '2017-09-01', end = '2017-09-30')
+# september <- main(start = '2017-09-01', end = '2017-09-30')
 # saveRDS(september, file = 'sep.rds')
 
 # get october events
-october <- main(start = '2017-10-01', end = Sys.Date())
+# october <- main(start = '2017-10-01', end = Sys.Date())
 # saveRDS(october, file = 'oct.rds')
 
